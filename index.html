@@ -17,6 +17,7 @@
         <h2>Novo cliente</h2>
         <form id="customer-form">
           <div class="grid">
+            <label>ID do cliente <input type="text" id="customer-id" placeholder="Ex: CLI-001" maxlength="30" /></label>
             <label>Nome <input type="text" id="name" required maxlength="80" /></label>
             <label>Telefone <input type="tel" id="phone" placeholder="(00) 00000-0000" required /></label>
             <label>E-mail <input type="email" id="email" placeholder="cliente@email.com" /></label>
@@ -29,7 +30,7 @@
       <section class="card">
         <div class="section-header">
           <h2>Clientes cadastrados</h2>
-          <input type="search" id="search" placeholder="Buscar por nome ou telefone" />
+          <input type="search" id="search" placeholder="Buscar por nome, telefone ou ID" />
         </div>
         <div id="customers-list" class="customers-list"></div>
       </section>
@@ -39,6 +40,7 @@
       <article class="customer-item">
         <div class="customer-main">
           <h3 class="customer-name"></h3>
+          <p class="customer-id-line"></p>
           <p class="customer-contact"></p>
           <p class="customer-credit"></p>
         </div>
@@ -48,9 +50,15 @@
           <span class="badge"></span>
         </div>
 
+        <div class="actions-row">
+          <button class="report-btn" type="button">Gerar relatório (PDF)</button>
+          <button class="delete-btn" type="button">Excluir cliente</button>
+        </div>
+
         <details>
           <summary>Editar cliente</summary>
           <form class="edit-form inline-grid">
+            <label>ID <input type="text" class="edit-id" maxlength="30" /></label>
             <label>Nome <input type="text" class="edit-name" required /></label>
             <label>Telefone <input type="tel" class="edit-phone" required /></label>
             <label>E-mail <input type="email" class="edit-email" /></label>
@@ -98,8 +106,6 @@
           <h4>Pagamentos</h4>
           <ul class="payment-history"></ul>
         </div>
-
-        <button class="delete-btn" type="button">Excluir cliente</button>
       </article>
     </template>
 

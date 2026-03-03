@@ -1,4 +1,4 @@
-const STORAGE_KEY = "clientes-loja-roupas-v3";
+const STORAGE_KEY = "clientes-loja-roupas-v4";
 
 const form = document.getElementById("customer-form");
 const list = document.getElementById("customers-list");
@@ -10,8 +10,17 @@ let customers = normalizeCustomers(loadCustomers());
 form.addEventListener("submit", (event) => {
   event.preventDefault();
 
+  const providedId = document.getElementById("customer-id").value.trim();
+  const customerId = providedId || generateCustomerId();
+
+  if (customers.some((entry) => entry.customerCode === customerId)) {
+    window.alert("Já existe um cliente com esse ID.");
+    return;
+  }
+
   const customer = {
     id: crypto.randomUUID(),
+    customerCode: customerId,
     name: document.getElementById("name").value.trim(),
     phone: document.getElementById("phone").value.trim(),
     email: document.getElementById("email").value.trim(),
@@ -37,7 +46,8 @@ function render() {
   const filtered = customers.filter((customer) => {
     return (
       customer.name.toLowerCase().includes(query) ||
-      customer.phone.toLowerCase().includes(query)
+      customer.phone.toLowerCase().includes(query) ||
+      customer.customerCode.toLowerCase().includes(query)
     );
   });
 
@@ -54,6 +64,7 @@ function render() {
     const fragment = template.content.cloneNode(true);
 
     fragment.querySelector(".customer-name").textContent = customer.name;
+    fragment.querySelector(".customer-id-line").textContent = `ID: ${customer.customerCode}`;
     fragment.querySelector(".customer-contact").textContent = `${customer.phone}${
       customer.email ? ` • ${customer.email}` : ""
     }`;
@@ -80,6 +91,7 @@ function render() {
     bindPurchaseForm(fragment, customer);
     bindPaymentForm(fragment, customer);
     bindDelete(fragment, customer);
+    bindReport(fragment, customer);
     renderPurchases(fragment, customer);
     renderPayments(fragment, customer);
 
@@ -89,6 +101,7 @@ function render() {
 
 function bindEditForm(fragment, customer) {
   const editForm = fragment.querySelector(".edit-form");
+  editForm.querySelector(".edit-id").value = customer.customerCode;
   editForm.querySelector(".edit-name").value = customer.name;
   editForm.querySelector(".edit-phone").value = customer.phone;
   editForm.querySelector(".edit-email").value = customer.email || "";
@@ -99,6 +112,16 @@ function bindEditForm(fragment, customer) {
     const index = customers.findIndex((entry) => entry.id === customer.id);
     if (index === -1) return;
 
+    const newCode = editForm.querySelector(".edit-id").value.trim() || generateCustomerId();
+    const duplicated = customers.some(
+      (entry) => entry.id !== customer.id && entry.customerCode === newCode
+    );
+    if (duplicated) {
+      window.alert("Já existe outro cliente com esse ID.");
+      return;
+    }
+
+    customers[index].customerCode = newCode;
     customers[index].name = editForm.querySelector(".edit-name").value.trim();
     customers[index].phone = editForm.querySelector(".edit-phone").value.trim();
     customers[index].email = editForm.querySelector(".edit-email").value.trim();
@@ -130,14 +153,12 @@ function bindPurchaseForm(fragment, customer) {
     const index = customers.findIndex((entry) => entry.id === customer.id);
     if (index === -1) return;
 
-    const purchaseInstallments = generateInstallments(amount, installments, firstDueDate);
-
     customers[index].purchases.unshift({
       id: crypto.randomUUID(),
       amount,
       date,
       paymentType,
-      installments: purchaseInstallments,
+      installments: generateInstallments(amount, installments, firstDueDate),
     });
 
     persist();
@@ -173,11 +194,56 @@ function bindPaymentForm(fragment, customer) {
 }
 
 function bindDelete(fragment, customer) {
-  const deleteBtn = fragment.querySelector(".delete-btn");
-  deleteBtn.addEventListener("click", () => {
+  fragment.querySelector(".delete-btn").addEventListener("click", () => {
     customers = customers.filter((entry) => entry.id !== customer.id);
     persist();
     render();
+  });
+}
+
+function bindReport(fragment, customer) {
+  fragment.querySelector(".report-btn").addEventListener("click", () => {
+    const totals = getTotals(customer);
+    const paymentApplied = getPaymentAllocation(customer);
+    const installments = getAllInstallments(customer).sort((a, b) => (a.dueDate < b.dueDate ? -1 : 1));
+
+    const installmentsRows = installments
+      .map((ins) => {
+        const paid = paymentApplied.byInstallmentId[ins.id] || 0;
+        const pending = Math.max(ins.amount - paid, 0);
+        return `<tr><td>${ins.number}/${ins.total}</td><td>${formatDateOnly(ins.dueDate)}</td><td>${money(ins.amount)}</td><td>${money(paid)}</td><td>${money(pending)}</td></tr>`;
+      })
+      .join("");
+
+    const paymentsRows = customer.payments
+      .map(
+        (p) =>
+          `<tr><td>${formatDateOnly(p.date)}</td><td>${labelPaymentType(p.paymentType)}</td><td>${money(p.amount)}</td></tr>`
+      )
+      .join("");
+
+    const reportWindow = window.open("", "_blank");
+    if (!reportWindow) {
+      window.alert("Não foi possível abrir a janela do relatório.");
+      return;
+    }
+
+    reportWindow.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Relatório ${escapeHtml(
+      customer.name
+    )}</title><style>body{font-family:Arial,sans-serif;padding:24px}table{width:100%;border-collapse:collapse;margin:12px 0}th,td{border:1px solid #ccc;padding:6px;text-align:left}h1,h2{margin:8px 0}</style></head><body><h1>Ficha do Cliente</h1><p><strong>ID:</strong> ${escapeHtml(
+      customer.customerCode
+    )}<br><strong>Nome:</strong> ${escapeHtml(customer.name)}<br><strong>Telefone:</strong> ${escapeHtml(
+      customer.phone
+    )}<br><strong>E-mail:</strong> ${escapeHtml(customer.email || "-")}</p><h2>Resumo</h2><p>Total compras: ${money(
+      totals.totalPurchases
+    )}<br>Total pagamentos: ${money(totals.totalPayments)}<br>Saldo devedor: ${money(
+      totals.outstanding
+    )}<br>Em atraso: ${money(totals.overdue)}</p><h2>Parcelas</h2><table><thead><tr><th>Parcela</th><th>Vencimento</th><th>Valor</th><th>Pago</th><th>Em aberto</th></tr></thead><tbody>${
+      installmentsRows || '<tr><td colspan="5">Sem parcelas</td></tr>'
+    }</tbody></table><h2>Pagamentos</h2><table><thead><tr><th>Data</th><th>Tipo</th><th>Valor</th></tr></thead><tbody>${
+      paymentsRows || '<tr><td colspan="3">Sem pagamentos</td></tr>'
+    }</tbody></table><script>window.print()</script></body></html>`);
+    reportWindow.document.close();
   });
 }
 
@@ -194,7 +260,9 @@ function renderPurchases(fragment, customer) {
 
   customer.purchases.forEach((purchase) => {
     const li = document.createElement("li");
-    const installmentLines = purchase.installments
+    li.className = "history-item";
+
+    const details = purchase.installments
       .map((installment) => {
         const paidPart = paymentApplied.byInstallmentId[installment.id] || 0;
         const pending = Math.max(installment.amount - paidPart, 0);
@@ -205,9 +273,24 @@ function renderPurchases(fragment, customer) {
       })
       .join(" • ");
 
-    li.textContent = `${formatDateOnly(purchase.date)} | ${money(purchase.amount)} | ${labelPaymentType(
+    const text = document.createElement("span");
+    text.textContent = `${formatDateOnly(purchase.date)} | ${money(purchase.amount)} | ${labelPaymentType(
       purchase.paymentType
-    )} | Parcelas: ${installmentLines}`;
+    )} | ${details}`;
+
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "mini-btn";
+    editBtn.textContent = "Editar";
+    editBtn.addEventListener("click", () => editPurchase(customer.id, purchase.id));
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "mini-btn danger-mini";
+    removeBtn.textContent = "Excluir";
+    removeBtn.addEventListener("click", () => removePurchase(customer.id, purchase.id));
+
+    li.append(text, editBtn, removeBtn);
     ul.appendChild(li);
   });
 }
@@ -224,11 +307,96 @@ function renderPayments(fragment, customer) {
 
   customer.payments.forEach((payment) => {
     const li = document.createElement("li");
-    li.textContent = `${formatDateOnly(payment.date)} — ${money(payment.amount)} (${labelPaymentType(
+    li.className = "history-item";
+
+    const text = document.createElement("span");
+    text.textContent = `${formatDateOnly(payment.date)} — ${money(payment.amount)} (${labelPaymentType(
       payment.paymentType
     )})`;
+
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "mini-btn";
+    editBtn.textContent = "Editar";
+    editBtn.addEventListener("click", () => editPayment(customer.id, payment.id));
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "mini-btn danger-mini";
+    removeBtn.textContent = "Excluir";
+    removeBtn.addEventListener("click", () => removePayment(customer.id, payment.id));
+
+    li.append(text, editBtn, removeBtn);
     ul.appendChild(li);
   });
+}
+
+function editPurchase(customerId, purchaseId) {
+  const customer = customers.find((c) => c.id === customerId);
+  if (!customer) return;
+  const purchase = customer.purchases.find((p) => p.id === purchaseId);
+  if (!purchase) return;
+
+  const amount = Number(window.prompt("Novo valor total da compra:", String(purchase.amount)));
+  const date = window.prompt("Nova data da compra (AAAA-MM-DD):", purchase.date);
+  const type = window.prompt("Tipo (cartao, dinheiro, pix):", purchase.paymentType);
+  const installmentsCount = Number(
+    window.prompt("Quantidade de parcelas:", String(purchase.installments?.length || 1))
+  );
+  const firstDue = window.prompt(
+    "Primeiro vencimento (AAAA-MM-DD):",
+    purchase.installments?.[0]?.dueDate || todayISO()
+  );
+
+  if (!amount || amount <= 0 || !date || !["cartao", "dinheiro", "pix"].includes(type) || !installmentsCount || installmentsCount < 1 || !firstDue) {
+    return;
+  }
+
+  purchase.amount = amount;
+  purchase.date = date;
+  purchase.paymentType = type;
+  purchase.installments = generateInstallments(amount, installmentsCount, firstDue);
+
+  persist();
+  render();
+}
+
+function editPayment(customerId, paymentId) {
+  const customer = customers.find((c) => c.id === customerId);
+  if (!customer) return;
+  const payment = customer.payments.find((p) => p.id === paymentId);
+  if (!payment) return;
+
+  const amount = Number(window.prompt("Novo valor do pagamento:", String(payment.amount)));
+  const date = window.prompt("Nova data do pagamento (AAAA-MM-DD):", payment.date);
+  const type = window.prompt("Tipo (cartao, dinheiro, pix):", payment.paymentType);
+
+  if (!amount || amount <= 0 || !date || !["cartao", "dinheiro", "pix"].includes(type)) {
+    return;
+  }
+
+  payment.amount = amount;
+  payment.date = date;
+  payment.paymentType = type;
+
+  persist();
+  render();
+}
+
+function removePurchase(customerId, purchaseId) {
+  const index = customers.findIndex((c) => c.id === customerId);
+  if (index === -1) return;
+  customers[index].purchases = customers[index].purchases.filter((p) => p.id !== purchaseId);
+  persist();
+  render();
+}
+
+function removePayment(customerId, paymentId) {
+  const index = customers.findIndex((c) => c.id === customerId);
+  if (index === -1) return;
+  customers[index].payments = customers[index].payments.filter((p) => p.id !== paymentId);
+  persist();
+  render();
 }
 
 function getTotals(customer) {
@@ -241,9 +409,7 @@ function getTotals(customer) {
   const overdue = allInstallments.reduce((acc, installment) => {
     const paid = allocation.byInstallmentId[installment.id] || 0;
     const pending = Math.max(installment.amount - paid, 0);
-    if (pending > 0 && isPastDate(installment.dueDate)) {
-      return acc + pending;
-    }
+    if (pending > 0 && isPastDate(installment.dueDate)) return acc + pending;
     return acc;
   }, 0);
 
@@ -252,16 +418,11 @@ function getTotals(customer) {
 
 function getPaymentAllocation(customer) {
   const installments = getAllInstallments(customer).sort((a, b) => (a.dueDate < b.dueDate ? -1 : 1));
-  const payments = [...customer.payments].sort((a, b) => (a.date < b.date ? -1 : 1));
-  let remainingPayment = payments.reduce((acc, item) => acc + item.amount, 0);
+  let remainingPayment = customer.payments.reduce((acc, item) => acc + item.amount, 0);
   const byInstallmentId = {};
 
   installments.forEach((installment) => {
-    if (remainingPayment <= 0) {
-      byInstallmentId[installment.id] = 0;
-      return;
-    }
-    const paid = Math.min(installment.amount, remainingPayment);
+    const paid = remainingPayment > 0 ? Math.min(installment.amount, remainingPayment) : 0;
     byInstallmentId[installment.id] = paid;
     remainingPayment -= paid;
   });
@@ -271,18 +432,16 @@ function getPaymentAllocation(customer) {
 
 function getAllInstallments(customer) {
   return customer.purchases.flatMap((purchase) => {
-    if (Array.isArray(purchase.installments) && purchase.installments.length) {
-      return purchase.installments;
-    }
-
-    const fallbackInstallment = {
-      id: `${purchase.id || crypto.randomUUID()}-1`,
-      number: 1,
-      total: 1,
-      amount: Number(purchase.amount) || 0,
-      dueDate: purchase.dueDate || purchase.date || todayISO(),
-    };
-    return [fallbackInstallment];
+    if (Array.isArray(purchase.installments) && purchase.installments.length) return purchase.installments;
+    return [
+      {
+        id: `${purchase.id || crypto.randomUUID()}-1`,
+        number: 1,
+        total: 1,
+        amount: Number(purchase.amount) || 0,
+        dueDate: purchase.dueDate || purchase.date || todayISO(),
+      },
+    ];
   });
 }
 
@@ -334,6 +493,20 @@ function labelPaymentType(type) {
   return "Não informado";
 }
 
+function generateCustomerId() {
+  const count = customers.length + 1;
+  return `CLI-${String(count).padStart(4, "0")}`;
+}
+
+function escapeHtml(text) {
+  return String(text)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 function normalizeCustomers(rawCustomers) {
   return rawCustomers.map((item) => {
     const purchases = Array.isArray(item.purchases)
@@ -370,6 +543,7 @@ function normalizeCustomers(rawCustomers) {
 
     return {
       id: item.id || crypto.randomUUID(),
+      customerCode: item.customerCode || item.code || generateCustomerId(),
       name: item.name || "",
       phone: item.phone || "",
       email: item.email || "",
