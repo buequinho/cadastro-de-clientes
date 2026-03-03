@@ -7,7 +7,8 @@
   --text: #1f2430;
   --muted: #5a6274;
   --ok: #2f9e44;
-  --alert: #e8590c;
+  --alert: #c92a2a;
+  --warning: #e67700;
   --danger: #c92a2a;
   font-family: "Inter", "Segoe UI", sans-serif;
 }
@@ -48,7 +49,8 @@ main {
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.07);
 }
 
-.grid {
+.grid,
+.inline-grid {
   display: grid;
   gap: 0.75rem;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -62,7 +64,8 @@ label {
 }
 
 input,
-button {
+button,
+summary {
   font: inherit;
 }
 
@@ -137,15 +140,25 @@ button:hover {
   background: var(--alert);
 }
 
-.payment-form {
-  display: flex;
-  gap: 0.7rem;
-  align-items: flex-end;
-  flex-wrap: wrap;
+.badge.warning {
+  background: var(--warning);
 }
 
-.payment-form label {
-  min-width: 220px;
+details {
+  background: #f9f7ff;
+  border: 1px solid #e7ddff;
+  border-radius: 10px;
+  padding: 0.55rem;
+}
+
+summary {
+  cursor: pointer;
+  color: #5a36a0;
+}
+
+.inline-grid h4 {
+  margin: 0.2rem 0;
+  grid-column: 1 / -1;
 }
 
 .history h4 {

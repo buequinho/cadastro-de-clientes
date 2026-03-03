@@ -9,7 +9,7 @@
   <body>
     <header>
       <h1>Cadastro de Clientes</h1>
-      <p>Controle digital de clientes e pagamentos para loja de roupas.</p>
+      <p>Controle digital de clientes, compras e pagamentos da loja de roupas.</p>
     </header>
 
     <main>
@@ -54,21 +54,59 @@
           <p class="customer-contact"></p>
           <p class="customer-credit"></p>
         </div>
+
         <div class="customer-finance">
           <p class="customer-debt"></p>
           <span class="badge"></span>
         </div>
-        <form class="payment-form">
+
+        <details>
+          <summary>Editar cliente</summary>
+          <form class="edit-form inline-grid">
+            <label>Nome <input type="text" class="edit-name" required /></label>
+            <label>Telefone <input type="tel" class="edit-phone" required /></label>
+            <label>E-mail <input type="email" class="edit-email" /></label>
+            <label>Limite (R$) <input type="number" class="edit-limit" min="0" step="0.01" /></label>
+            <button type="submit">Salvar edição</button>
+          </form>
+        </details>
+
+        <form class="purchase-form inline-grid">
+          <h4>Registrar compra</h4>
           <label>
-            Registrar pagamento (R$)
-            <input type="number" min="0.01" step="0.01" required />
+            Valor da compra (R$)
+            <input type="number" class="purchase-amount" min="0.01" step="0.01" required />
+          </label>
+          <label>
+            Data da compra
+            <input type="date" class="purchase-date" required />
+          </label>
+          <label>
+            Vencimento
+            <input type="date" class="purchase-due" required />
+          </label>
+          <button type="submit">Salvar compra</button>
+        </form>
+
+        <form class="payment-form inline-grid">
+          <h4>Registrar pagamento</h4>
+          <label>
+            Valor pago (R$)
+            <input type="number" class="payment-amount" min="0.01" step="0.01" required />
           </label>
           <button type="submit">Salvar pagamento</button>
         </form>
+
         <div class="history">
-          <h4>Histórico</h4>
-          <ul></ul>
+          <h4>Compras</h4>
+          <ul class="purchase-history"></ul>
         </div>
+
+        <div class="history">
+          <h4>Pagamentos</h4>
+          <ul class="payment-history"></ul>
+        </div>
+
         <button class="delete-btn" type="button">Excluir cliente</button>
       </article>
     </template>

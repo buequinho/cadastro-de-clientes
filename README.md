@@ -1,26 +1,33 @@
 # Cadastro de clientes - Loja de roupas
 
-Sistema simples para substituir a ficha de papel usada no controle de pagamentos dos clientes.
+Sistema web para substituir a ficha de papel no controle de compras e pagamentos dos clientes.
 
 ## Funcionalidades
 
 - Cadastro de clientes com nome, telefone, e-mail e limite de crédito.
-- Busca rápida por nome ou telefone.
-- Registro de pagamentos por cliente.
-- Controle de débito atual.
-- Histórico de pagamentos.
+- Edição de dados do cliente.
+- Registro de compras com valor, data da compra e vencimento.
+- Registro de pagamentos.
+- Cálculo automático de:
+  - total de compras,
+  - total pago,
+  - saldo devedor,
+  - valor em atraso (vencido).
+- Busca por nome ou telefone.
 - Persistência local no navegador com `localStorage`.
 
 ## Como usar
 
-1. Abra o arquivo `index.html` no navegador.
-2. Cadastre um cliente no formulário principal.
-3. Para registrar uma nova compra no fiado, dê **duplo clique** no cartão do cliente e informe o valor.
-4. Para registrar pagamento, use o campo "Registrar pagamento" no próprio cartão.
-5. Os dados ficam salvos no navegador automaticamente.
+1. Abra `index.html` no navegador.
+2. Cadastre o cliente.
+3. No cartão do cliente:
+   - use **Editar cliente** para atualizar dados;
+   - use **Registrar compra** para lançar valor e vencimento;
+   - use **Registrar pagamento** para abater o saldo.
+4. A seção de compras mostra o que está em aberto e sinaliza compras vencidas.
 
 ## Estrutura
 
 - `index.html`: interface principal.
 - `styles.css`: estilos da aplicação.
-- `script.js`: lógica de cadastro, pagamento e persistência.
+- `script.js`: lógica de cadastro, compras, pagamentos, vencimento e cálculos.
