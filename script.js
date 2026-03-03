@@ -1,4 +1,4 @@
-const STORAGE_KEY = "clientes-loja-roupas-v2";
+const STORAGE_KEY = "clientes-loja-roupas-v3";
 
 const form = document.getElementById("customer-form");
 const list = document.getElementById("customers-list");
@@ -112,24 +112,32 @@ function bindEditForm(fragment, customer) {
 function bindPurchaseForm(fragment, customer) {
   const purchaseForm = fragment.querySelector(".purchase-form");
   purchaseForm.querySelector(".purchase-date").value = todayISO();
+  purchaseForm.querySelector(".purchase-first-due").value = todayISO();
 
   purchaseForm.addEventListener("submit", (event) => {
     event.preventDefault();
 
     const amount = Number(purchaseForm.querySelector(".purchase-amount").value);
     const date = purchaseForm.querySelector(".purchase-date").value;
-    const dueDate = purchaseForm.querySelector(".purchase-due").value;
+    const paymentType = purchaseForm.querySelector(".purchase-type").value;
+    const installments = Number(purchaseForm.querySelector(".purchase-installments").value);
+    const firstDueDate = purchaseForm.querySelector(".purchase-first-due").value;
 
-    if (!amount || amount <= 0 || !date || !dueDate) return;
+    if (!amount || amount <= 0 || !date || !paymentType || !installments || installments < 1 || !firstDueDate) {
+      return;
+    }
 
     const index = customers.findIndex((entry) => entry.id === customer.id);
     if (index === -1) return;
+
+    const purchaseInstallments = generateInstallments(amount, installments, firstDueDate);
 
     customers[index].purchases.unshift({
       id: crypto.randomUUID(),
       amount,
       date,
-      dueDate,
+      paymentType,
+      installments: purchaseInstallments,
     });
 
     persist();
@@ -139,11 +147,15 @@ function bindPurchaseForm(fragment, customer) {
 
 function bindPaymentForm(fragment, customer) {
   const paymentForm = fragment.querySelector(".payment-form");
+  paymentForm.querySelector(".payment-date").value = todayISO();
 
   paymentForm.addEventListener("submit", (event) => {
     event.preventDefault();
     const amount = Number(paymentForm.querySelector(".payment-amount").value);
-    if (!amount || amount <= 0) return;
+    const date = paymentForm.querySelector(".payment-date").value;
+    const paymentType = paymentForm.querySelector(".payment-type").value;
+
+    if (!amount || amount <= 0 || !date || !paymentType) return;
 
     const index = customers.findIndex((entry) => entry.id === customer.id);
     if (index === -1) return;
@@ -151,7 +163,8 @@ function bindPaymentForm(fragment, customer) {
     customers[index].payments.unshift({
       id: crypto.randomUUID(),
       amount,
-      date: new Date().toISOString(),
+      date,
+      paymentType,
     });
 
     persist();
@@ -170,27 +183,31 @@ function bindDelete(fragment, customer) {
 
 function renderPurchases(fragment, customer) {
   const ul = fragment.querySelector(".purchase-history");
-  const purchases = [...customer.purchases].sort((a, b) => (a.dueDate < b.dueDate ? -1 : 1));
   const paymentApplied = getPaymentAllocation(customer);
 
-  if (!purchases.length) {
+  if (!customer.purchases.length) {
     const li = document.createElement("li");
     li.textContent = "Sem compras registradas.";
     ul.appendChild(li);
     return;
   }
 
-  purchases.forEach((purchase) => {
+  customer.purchases.forEach((purchase) => {
     const li = document.createElement("li");
-    const paidPart = paymentApplied.byPurchaseId[purchase.id] || 0;
-    const pending = Math.max(purchase.amount - paidPart, 0);
-    const overdue = pending > 0 && isPastDate(purchase.dueDate);
+    const installmentLines = purchase.installments
+      .map((installment) => {
+        const paidPart = paymentApplied.byInstallmentId[installment.id] || 0;
+        const pending = Math.max(installment.amount - paidPart, 0);
+        const overdue = pending > 0 && isPastDate(installment.dueDate);
+        return `${installment.number}/${installment.total}: ${money(installment.amount)} | aberto ${money(
+          pending
+        )} | vence ${formatDateOnly(installment.dueDate)}${overdue ? " (ATRASADO)" : ""}`;
+      })
+      .join(" • ");
 
-    li.textContent = `${formatDateOnly(purchase.date)} | Compra: ${money(purchase.amount)} | Pago: ${money(
-      paidPart
-    )} | Em aberto: ${money(pending)} | Vence: ${formatDateOnly(purchase.dueDate)}${
-      overdue ? " (ATRASADO)" : ""
-    }`;
+    li.textContent = `${formatDateOnly(purchase.date)} | ${money(purchase.amount)} | ${labelPaymentType(
+      purchase.paymentType
+    )} | Parcelas: ${installmentLines}`;
     ul.appendChild(li);
   });
 }
@@ -207,21 +224,24 @@ function renderPayments(fragment, customer) {
 
   customer.payments.forEach((payment) => {
     const li = document.createElement("li");
-    li.textContent = `${formatDate(payment.date)} — ${money(payment.amount)}`;
+    li.textContent = `${formatDateOnly(payment.date)} — ${money(payment.amount)} (${labelPaymentType(
+      payment.paymentType
+    )})`;
     ul.appendChild(li);
   });
 }
 
 function getTotals(customer) {
-  const totalPurchases = customer.purchases.reduce((acc, item) => acc + item.amount, 0);
+  const allInstallments = getAllInstallments(customer);
+  const totalPurchases = allInstallments.reduce((acc, item) => acc + item.amount, 0);
   const totalPayments = customer.payments.reduce((acc, item) => acc + item.amount, 0);
   const outstanding = Math.max(totalPurchases - totalPayments, 0);
 
   const allocation = getPaymentAllocation(customer);
-  const overdue = customer.purchases.reduce((acc, purchase) => {
-    const paid = allocation.byPurchaseId[purchase.id] || 0;
-    const pending = Math.max(purchase.amount - paid, 0);
-    if (pending > 0 && isPastDate(purchase.dueDate)) {
+  const overdue = allInstallments.reduce((acc, installment) => {
+    const paid = allocation.byInstallmentId[installment.id] || 0;
+    const pending = Math.max(installment.amount - paid, 0);
+    if (pending > 0 && isPastDate(installment.dueDate)) {
       return acc + pending;
     }
     return acc;
@@ -231,21 +251,69 @@ function getTotals(customer) {
 }
 
 function getPaymentAllocation(customer) {
-  const purchases = [...customer.purchases].sort((a, b) => (a.dueDate < b.dueDate ? -1 : 1));
-  let remainingPayment = customer.payments.reduce((acc, item) => acc + item.amount, 0);
-  const byPurchaseId = {};
+  const installments = getAllInstallments(customer).sort((a, b) => (a.dueDate < b.dueDate ? -1 : 1));
+  const payments = [...customer.payments].sort((a, b) => (a.date < b.date ? -1 : 1));
+  let remainingPayment = payments.reduce((acc, item) => acc + item.amount, 0);
+  const byInstallmentId = {};
 
-  purchases.forEach((purchase) => {
+  installments.forEach((installment) => {
     if (remainingPayment <= 0) {
-      byPurchaseId[purchase.id] = 0;
+      byInstallmentId[installment.id] = 0;
       return;
     }
-    const paid = Math.min(purchase.amount, remainingPayment);
-    byPurchaseId[purchase.id] = paid;
+    const paid = Math.min(installment.amount, remainingPayment);
+    byInstallmentId[installment.id] = paid;
     remainingPayment -= paid;
   });
 
-  return { byPurchaseId };
+  return { byInstallmentId };
+}
+
+function getAllInstallments(customer) {
+  return customer.purchases.flatMap((purchase) => {
+    if (Array.isArray(purchase.installments) && purchase.installments.length) {
+      return purchase.installments;
+    }
+
+    const fallbackInstallment = {
+      id: `${purchase.id || crypto.randomUUID()}-1`,
+      number: 1,
+      total: 1,
+      amount: Number(purchase.amount) || 0,
+      dueDate: purchase.dueDate || purchase.date || todayISO(),
+    };
+    return [fallbackInstallment];
+  });
+}
+
+function generateInstallments(totalAmount, count, firstDueDate) {
+  const installments = [];
+  const baseAmount = Math.floor((totalAmount / count) * 100) / 100;
+  let accumulated = 0;
+
+  for (let i = 1; i <= count; i += 1) {
+    const amount = i === count ? roundCurrency(totalAmount - accumulated) : baseAmount;
+    accumulated = roundCurrency(accumulated + amount);
+    installments.push({
+      id: crypto.randomUUID(),
+      number: i,
+      total: count,
+      amount,
+      dueDate: addMonthsToDate(firstDueDate, i - 1),
+    });
+  }
+
+  return installments;
+}
+
+function addMonthsToDate(yyyyMmDd, months) {
+  const [year, month, day] = yyyyMmDd.split("-").map(Number);
+  const date = new Date(year, month - 1 + months, day);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function roundCurrency(value) {
+  return Math.round(value * 100) / 100;
 }
 
 function isPastDate(yyyyMmDd) {
@@ -259,10 +327,46 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function labelPaymentType(type) {
+  if (type === "cartao") return "Cartão";
+  if (type === "dinheiro") return "Dinheiro";
+  if (type === "pix") return "PIX";
+  return "Não informado";
+}
+
 function normalizeCustomers(rawCustomers) {
   return rawCustomers.map((item) => {
-    const purchases = Array.isArray(item.purchases) ? item.purchases : [];
-    const payments = Array.isArray(item.payments) ? item.payments : [];
+    const purchases = Array.isArray(item.purchases)
+      ? item.purchases.map((purchase) => {
+          const installments = Array.isArray(purchase.installments)
+            ? purchase.installments
+            : [
+                {
+                  id: `${purchase.id || crypto.randomUUID()}-1`,
+                  number: 1,
+                  total: 1,
+                  amount: Number(purchase.amount) || 0,
+                  dueDate: purchase.dueDate || purchase.date || todayISO(),
+                },
+              ];
+          return {
+            id: purchase.id || crypto.randomUUID(),
+            amount: Number(purchase.amount) || installments.reduce((acc, ins) => acc + (Number(ins.amount) || 0), 0),
+            date: purchase.date || todayISO(),
+            paymentType: purchase.paymentType || "cartao",
+            installments,
+          };
+        })
+      : [];
+
+    const payments = Array.isArray(item.payments)
+      ? item.payments.map((payment) => ({
+          id: payment.id || crypto.randomUUID(),
+          amount: Number(payment.amount) || 0,
+          date: payment.date || todayISO(),
+          paymentType: payment.paymentType || "dinheiro",
+        }))
+      : [];
 
     return {
       id: item.id || crypto.randomUUID(),
@@ -297,13 +401,6 @@ function money(value) {
     style: "currency",
     currency: "BRL",
   }).format(value);
-}
-
-function formatDate(isoDate) {
-  return new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(new Date(isoDate));
 }
 
 function formatDateOnly(isoDate) {

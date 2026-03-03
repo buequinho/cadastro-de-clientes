@@ -1,33 +1,33 @@
 # Cadastro de clientes - Loja de roupas
 
-Sistema web para substituir a ficha de papel no controle de compras e pagamentos dos clientes.
+Sistema web para substituir a ficha de papel no controle de compras, parcelas e pagamentos dos clientes.
 
 ## Funcionalidades
 
-- Cadastro de clientes com nome, telefone, e-mail e limite de crédito.
-- Edição de dados do cliente.
-- Registro de compras com valor, data da compra e vencimento.
-- Registro de pagamentos.
-- Cálculo automático de:
-  - total de compras,
-  - total pago,
-  - saldo devedor,
-  - valor em atraso (vencido).
-- Busca por nome ou telefone.
-- Persistência local no navegador com `localStorage`.
+- Cadastro, edição, busca e exclusão de clientes.
+- Registro de compras com:
+  - valor,
+  - data da compra,
+  - tipo de pagamento (cartão, dinheiro, PIX),
+  - quantidade de parcelas,
+  - vencimento da primeira parcela.
+- Geração automática de parcelas mensais com vencimentos.
+- Registro de pagamento com:
+  - valor,
+  - data de pagamento (selecionável/editável),
+  - tipo de pagamento (cartão, dinheiro, PIX).
+- Cálculo automático de total comprado, total pago, saldo devedor e valor em atraso.
 
 ## Como usar
 
 1. Abra `index.html` no navegador.
 2. Cadastre o cliente.
-3. No cartão do cliente:
-   - use **Editar cliente** para atualizar dados;
-   - use **Registrar compra** para lançar valor e vencimento;
-   - use **Registrar pagamento** para abater o saldo.
-4. A seção de compras mostra o que está em aberto e sinaliza compras vencidas.
+3. Em **Registrar compra**, informe tipo de pagamento e parcelamento.
+4. Em **Registrar pagamento**, selecione a data e o tipo (cartão/dinheiro/PIX).
+5. Verifique em **Compras e parcelas** os vencimentos e o status de atraso.
 
 ## Estrutura
 
 - `index.html`: interface principal.
 - `styles.css`: estilos da aplicação.
-- `script.js`: lógica de cadastro, compras, pagamentos, vencimento e cálculos.
+- `script.js`: regras de cadastro, compras parceladas, pagamentos e cálculos.
