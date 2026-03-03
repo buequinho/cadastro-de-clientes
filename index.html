@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cadastro de Clientes | Loja de Roupas</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Cadastro de Clientes</h1>
+      <p>Controle digital de clientes, compras, parcelas e pagamentos da loja de roupas.</p>
+    </header>
+
+    <main>
+      <nav class="tabs card" aria-label="Navegação principal">
+        <button class="tab-btn active" data-tab="dashboard" type="button">Dashboard</button>
+        <button class="tab-btn" data-tab="clientes" type="button">Clientes</button>
+      </nav>
+
+      <section id="tab-dashboard" class="tab-content active">
+        <section class="card">
+          <h2>Dashboard</h2>
+          <div class="kpis">
+            <article class="kpi">
+              <h3>Total de clientes</h3>
+              <p id="kpi-total-clients">0</p>
+            </article>
+            <article class="kpi">
+              <h3>Clientes vencidos</h3>
+              <p id="kpi-overdue-clients">0</p>
+            </article>
+            <article class="kpi">
+              <h3>Total em atraso</h3>
+              <p id="kpi-overdue-amount">R$ 0,00</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Clientes com vencimento em atraso</h2>
+          <div id="overdue-customers-list" class="overdue-list"></div>
+        </section>
+      </section>
+
+      <section id="tab-clientes" class="tab-content">
+        <section class="card">
+          <h2>Novo cliente</h2>
+          <form id="customer-form">
+            <div class="grid">
+              <label>ID do cliente <input type="text" id="customer-id" placeholder="Ex: CLI-001" maxlength="30" /></label>
+              <label>Nome <input type="text" id="name" required maxlength="80" /></label>
+              <label>Telefone <input type="tel" id="phone" placeholder="(00) 00000-0000" required /></label>
+              <label>E-mail <input type="email" id="email" placeholder="cliente@email.com" /></label>
+              <label>Limite de crédito (R$) <input type="number" id="limit" min="0" step="0.01" value="0" /></label>
+            </div>
+            <button type="submit">Cadastrar cliente</button>
+          </form>
+        </section>
+
+        <section class="card">
+          <div class="section-header">
+            <h2>Clientes cadastrados</h2>
+            <input type="search" id="search" placeholder="Buscar por nome, telefone ou ID" />
+          </div>
+          <div id="customers-list" class="customers-list"></div>
+        </section>
+      </section>
+    </main>
+
+    <template id="customer-template">
+      <article class="customer-item">
+        <div class="customer-main">
+          <h3 class="customer-name"></h3>
+          <p class="customer-id-line"></p>
+          <p class="customer-contact"></p>
+          <p class="customer-credit"></p>
+        </div>
+
+        <div class="customer-finance">
+          <p class="customer-debt"></p>
+          <span class="badge"></span>
+        </div>
+
+        <div class="actions-row">
+          <button class="report-btn" type="button">Gerar relatório (PDF)</button>
+          <button class="delete-btn" type="button">Excluir cliente</button>
+        </div>
+
+        <details>
+          <summary>Editar cliente</summary>
+          <form class="edit-form inline-grid">
+            <label>ID <input type="text" class="edit-id" maxlength="30" /></label>
+            <label>Nome <input type="text" class="edit-name" required /></label>
+            <label>Telefone <input type="tel" class="edit-phone" required /></label>
+            <label>E-mail <input type="email" class="edit-email" /></label>
+            <label>Limite (R$) <input type="number" class="edit-limit" min="0" step="0.01" /></label>
+            <button type="submit">Salvar edição</button>
+          </form>
+        </details>
+
+        <form class="purchase-form inline-grid">
+          <h4>Registrar compra</h4>
+          <label>Valor da compra (R$) <input type="number" class="purchase-amount" min="0.01" step="0.01" required /></label>
+          <label>Data da compra <input type="date" class="purchase-date" required /></label>
+          <label>Tipo de pagamento
+            <select class="purchase-type" required>
+              <option value="ficha">Ficha (fiado)</option>
+              <option value="cartao">Cartão</option>
+              <option value="dinheiro">Dinheiro</option>
+              <option value="pix">PIX</option>
+            </select>
+          </label>
+          <label class="credit-only">Quantidade de parcelas <input type="number" class="purchase-installments" min="1" max="24" value="1" /></label>
+          <label class="credit-only">1º vencimento <input type="date" class="purchase-first-due" /></label>
+          <button type="submit">Salvar compra</button>
+        </form>
+
+        <form class="payment-form inline-grid">
+          <h4>Registrar pagamento</h4>
+          <label>Valor pago (R$) <input type="number" class="payment-amount" min="0.01" step="0.01" required /></label>
+          <label>Data de pagamento <input type="date" class="payment-date" required /></label>
+          <label>Tipo de pagamento
+            <select class="payment-type" required>
+              <option value="dinheiro">Dinheiro</option>
+              <option value="pix">PIX</option>
+              <option value="cartao">Cartão</option>
+            </select>
+          </label>
+          <button type="submit">Salvar pagamento</button>
+        </form>
+
+        <div class="history">
+          <h4>Compras e parcelas</h4>
+          <ul class="purchase-history"></ul>
+        </div>
+
+        <div class="history">
+          <h4>Pagamentos</h4>
+          <ul class="payment-history"></ul>
+        </div>
+      </article>
+    </template>
+
+    <script src="script.js"></script>
+  </body>
+</html>
