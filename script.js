@@ -134,8 +134,27 @@ function bindEditForm(fragment, customer) {
 
 function bindPurchaseForm(fragment, customer) {
   const purchaseForm = fragment.querySelector(".purchase-form");
+  const purchaseTypeInput = purchaseForm.querySelector(".purchase-type");
+  const installmentsInput = purchaseForm.querySelector(".purchase-installments");
+  const firstDueInput = purchaseForm.querySelector(".purchase-first-due");
+  const creditOnlyFields = purchaseForm.querySelectorAll(".credit-only");
+
   purchaseForm.querySelector(".purchase-date").value = todayISO();
-  purchaseForm.querySelector(".purchase-first-due").value = todayISO();
+  firstDueInput.value = todayISO();
+
+  const syncCreditFields = () => {
+    const isCreditPurchase = purchaseTypeInput.value === "ficha";
+    installmentsInput.required = isCreditPurchase;
+    firstDueInput.required = isCreditPurchase;
+    installmentsInput.disabled = !isCreditPurchase;
+    firstDueInput.disabled = !isCreditPurchase;
+    creditOnlyFields.forEach((field) => {
+      field.classList.toggle("hidden", !isCreditPurchase);
+    });
+  };
+
+  purchaseTypeInput.addEventListener("change", syncCreditFields);
+  syncCreditFields();
 
   purchaseForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -146,19 +165,28 @@ function bindPurchaseForm(fragment, customer) {
     const installments = Number(purchaseForm.querySelector(".purchase-installments").value);
     const firstDueDate = purchaseForm.querySelector(".purchase-first-due").value;
 
-    if (!amount || amount <= 0 || !date || !paymentType || !installments || installments < 1 || !firstDueDate) {
+    const isCreditPurchase = paymentType === "ficha";
+    if (!amount || amount <= 0 || !date || !paymentType) {
+      return;
+    }
+
+    if (isCreditPurchase && (!installments || installments < 1 || !firstDueDate)) {
       return;
     }
 
     const index = customers.findIndex((entry) => entry.id === customer.id);
     if (index === -1) return;
 
+    const purchaseInstallments = isCreditPurchase
+      ? generateInstallments(amount, installments, firstDueDate)
+      : [];
+
     customers[index].purchases.unshift({
       id: crypto.randomUUID(),
       amount,
       date,
       paymentType,
-      installments: generateInstallments(amount, installments, firstDueDate),
+      installments: purchaseInstallments,
     });
 
     persist();
@@ -274,9 +302,10 @@ function renderPurchases(fragment, customer) {
       .join(" • ");
 
     const text = document.createElement("span");
-    text.textContent = `${formatDateOnly(purchase.date)} | ${money(purchase.amount)} | ${labelPaymentType(
+    const baseLine = `${formatDateOnly(purchase.date)} | ${money(purchase.amount)} | ${labelPaymentType(
       purchase.paymentType
-    )} | ${details}`;
+    )}`;
+    text.textContent = purchase.paymentType === "ficha" ? `${baseLine} | ${details}` : `${baseLine} | sem vencimento`;
 
     const editBtn = document.createElement("button");
     editBtn.type = "button";
@@ -339,7 +368,7 @@ function editPurchase(customerId, purchaseId) {
 
   const amount = Number(window.prompt("Novo valor total da compra:", String(purchase.amount)));
   const date = window.prompt("Nova data da compra (AAAA-MM-DD):", purchase.date);
-  const type = window.prompt("Tipo (cartao, dinheiro, pix):", purchase.paymentType);
+  const type = window.prompt("Tipo (ficha, cartao, dinheiro, pix):", purchase.paymentType);
   const installmentsCount = Number(
     window.prompt("Quantidade de parcelas:", String(purchase.installments?.length || 1))
   );
@@ -348,14 +377,18 @@ function editPurchase(customerId, purchaseId) {
     purchase.installments?.[0]?.dueDate || todayISO()
   );
 
-  if (!amount || amount <= 0 || !date || !["cartao", "dinheiro", "pix"].includes(type) || !installmentsCount || installmentsCount < 1 || !firstDue) {
+  if (!amount || amount <= 0 || !date || !["ficha", "cartao", "dinheiro", "pix"].includes(type)) {
+    return;
+  }
+
+  if (type === "ficha" && (!installmentsCount || installmentsCount < 1 || !firstDue)) {
     return;
   }
 
   purchase.amount = amount;
   purchase.date = date;
   purchase.paymentType = type;
-  purchase.installments = generateInstallments(amount, installmentsCount, firstDue);
+  purchase.installments = type === "ficha" ? generateInstallments(amount, installmentsCount, firstDue) : [];
 
   persist();
   render();
@@ -400,7 +433,8 @@ function removePayment(customerId, paymentId) {
 }
 
 function getTotals(customer) {
-  const allInstallments = getAllInstallments(customer);
+  const creditPurchases = customer.purchases.filter((purchase) => purchase.paymentType === "ficha");
+  const allInstallments = getAllInstallments({ ...customer, purchases: creditPurchases });
   const totalPurchases = allInstallments.reduce((acc, item) => acc + item.amount, 0);
   const totalPayments = customer.payments.reduce((acc, item) => acc + item.amount, 0);
   const outstanding = Math.max(totalPurchases - totalPayments, 0);
@@ -417,7 +451,8 @@ function getTotals(customer) {
 }
 
 function getPaymentAllocation(customer) {
-  const installments = getAllInstallments(customer).sort((a, b) => (a.dueDate < b.dueDate ? -1 : 1));
+  const creditPurchases = customer.purchases.filter((purchase) => purchase.paymentType === "ficha");
+  const installments = getAllInstallments({ ...customer, purchases: creditPurchases }).sort((a, b) => (a.dueDate < b.dueDate ? -1 : 1));
   let remainingPayment = customer.payments.reduce((acc, item) => acc + item.amount, 0);
   const byInstallmentId = {};
 
@@ -487,6 +522,7 @@ function todayISO() {
 }
 
 function labelPaymentType(type) {
+  if (type === "ficha") return "Ficha";
   if (type === "cartao") return "Cartão";
   if (type === "dinheiro") return "Dinheiro";
   if (type === "pix") return "PIX";
@@ -526,8 +562,8 @@ function normalizeCustomers(rawCustomers) {
             id: purchase.id || crypto.randomUUID(),
             amount: Number(purchase.amount) || installments.reduce((acc, ins) => acc + (Number(ins.amount) || 0), 0),
             date: purchase.date || todayISO(),
-            paymentType: purchase.paymentType || "cartao",
-            installments,
+            paymentType: purchase.paymentType || "ficha",
+            installments: purchase.paymentType === "ficha" ? installments : [],
           };
         })
       : [];

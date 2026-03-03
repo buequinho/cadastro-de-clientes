@@ -73,13 +73,14 @@
           <label>Data da compra <input type="date" class="purchase-date" required /></label>
           <label>Tipo de pagamento
             <select class="purchase-type" required>
+              <option value="ficha">Ficha (fiado)</option>
               <option value="cartao">Cartão</option>
               <option value="dinheiro">Dinheiro</option>
               <option value="pix">PIX</option>
             </select>
           </label>
-          <label>Quantidade de parcelas <input type="number" class="purchase-installments" min="1" max="24" value="1" required /></label>
-          <label>1º vencimento <input type="date" class="purchase-first-due" required /></label>
+          <label class="credit-only">Quantidade de parcelas <input type="number" class="purchase-installments" min="1" max="24" value="1" /></label>
+          <label class="credit-only">1º vencimento <input type="date" class="purchase-first-due" /></label>
           <button type="submit">Salvar compra</button>
         </form>
 

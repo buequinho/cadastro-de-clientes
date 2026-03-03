@@ -6,8 +6,9 @@ Sistema web para substituir a ficha de papel no controle de compras, parcelas e 
 
 - Cadastro de cliente com **ID** (manual ou automático), nome, telefone, e-mail e limite.
 - Edição e exclusão de cliente.
-- Registro de compras com valor, tipo de pagamento e parcelamento.
-- Geração automática dos vencimentos mensais das parcelas.
+- Registro de compras com valor e tipo de pagamento (`ficha`, cartão, dinheiro, PIX).
+- Vencimento e parcelamento apenas para compras no tipo **ficha**.
+- Geração automática dos vencimentos mensais das parcelas da ficha.
 - Registro de pagamentos com valor, tipo e data.
 - **Edição e exclusão de compras e pagamentos** no histórico.
 - Cálculo automático de total comprado, total pago, saldo devedor e valor em atraso.
